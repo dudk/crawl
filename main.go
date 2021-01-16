@@ -28,6 +28,13 @@ func (f flags) validate() error {
 	if len(f.path) == 0 {
 		return fmt.Errorf("path is required")
 	}
+	fi, err := os.Lstat(f.path)
+	if err != nil {
+		return fmt.Errorf("invalid path: %w", err)
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("path is not a direcotry")
+	}
 
 	if len(f.rawURL) == 0 {
 		return fmt.Errorf("URL is required")
