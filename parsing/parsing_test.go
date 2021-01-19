@@ -21,6 +21,7 @@ func TestParser(t *testing.T) {
 		"http://base.org/c",
 		"http://base.org/c/d",
 		"http://base.org/c/f",
+		"http://base.org/G",
 	}
 
 	buf := bytes.NewBuffer([]byte(`<html>
@@ -32,6 +33,7 @@ func TestParser(t *testing.T) {
 		<a href="http://base.org/c/d"></a>
 		<a href="http://base.net/e"></a>
 		<a href="f"></a>
+		<a href="/G#fragment"></a>
 	</body>
 	</html>`))
 	u, _ := url.Parse("http://base.org/c/")
