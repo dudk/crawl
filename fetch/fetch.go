@@ -30,7 +30,6 @@ type (
 
 // Fetcher is responsible for recursive fetch of pages.
 type Fetcher struct {
-	BaseURL    string
 	Client     *http.Client
 	Parser     BodyParser
 	BodyReader BodyReader
