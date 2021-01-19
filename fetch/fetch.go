@@ -8,7 +8,14 @@ import (
 )
 
 type (
-	ParseFunc func(r io.Reader) ([]string, error)
+	// BodyParser parses the HTTP response body and returns a list of URLs
+	// found in the body.
+	BodyParser interface {
+		ParseBody(r io.Reader) ([]string, error)
+	}
+
+	// ParseBodyFunc implements BodyParser.
+	ParseBodyFunc func(r io.Reader) ([]string, error)
 
 	// BodyReader reads the HTTP response body. It must consume all data
 	// available in io.Reader. BodyReader must respect context and return
@@ -25,7 +32,7 @@ type (
 type Fetcher struct {
 	BaseURL    string
 	Client     *http.Client
-	Parser     ParseFunc
+	Parser     ParseBodyFunc
 	BodyReader BodyReader
 }
 
@@ -97,4 +104,9 @@ func (f Fetcher) parseAndRead(ctx context.Context, res *http.Response) ([]string
 // ReadBody implements BodyReader.
 func (fn BodyReaderFunc) ReadBody(ctx context.Context, r io.Reader) error {
 	return fn(ctx, r)
+}
+
+// ParseBody implements BodyParser.
+func (fn ParseBodyFunc) ParseBody(r io.Reader) ([]string, error) {
+	return fn(r)
 }
