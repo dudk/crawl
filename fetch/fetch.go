@@ -5,17 +5,18 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 )
 
 type (
 	// BodyParser parses the HTTP response body and returns a list of URLs
 	// found in the body.
 	BodyParser interface {
-		ParseBody(r io.Reader) ([]string, error)
+		ParseBody(URL *url.URL, r io.Reader) ([]string, error)
 	}
 
 	// ParseBodyFunc implements BodyParser.
-	ParseBodyFunc func(r io.Reader) ([]string, error)
+	ParseBodyFunc func(URL *url.URL, r io.Reader) ([]string, error)
 
 	// BodyReader reads the HTTP response body. It must consume all data
 	// available in io.Reader. BodyReader must respect context and return
@@ -55,7 +56,7 @@ func (f Fetcher) Fetch(ctx context.Context, url string) ([]string, error) {
 }
 
 func (f Fetcher) parseOnly(res *http.Response) ([]string, error) {
-	links, err := f.Parser.ParseBody(res.Body)
+	links, err := f.Parser.ParseBody(res.Request.URL, res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing links: %w", err)
 	}
@@ -82,7 +83,7 @@ func (f Fetcher) parseAndRead(ctx context.Context, res *http.Response) ([]string
 
 	// read body from pipe
 	var err error
-	links, err := f.Parser.ParseBody(pr)
+	links, err := f.Parser.ParseBody(res.Request.URL, pr)
 	if err != nil {
 		// if pipe reader has failed, we need to close writer
 		pw.Close()
@@ -106,6 +107,6 @@ func (fn BodyReaderFunc) ReadBody(ctx context.Context, r io.Reader) error {
 }
 
 // ParseBody implements BodyParser.
-func (fn ParseBodyFunc) ParseBody(r io.Reader) ([]string, error) {
-	return fn(r)
+func (fn ParseBodyFunc) ParseBody(u *url.URL, r io.Reader) ([]string, error) {
+	return fn(u, r)
 }

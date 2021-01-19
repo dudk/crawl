@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"reflect"
 	"strings"
 	"testing"
@@ -41,7 +42,7 @@ func TestFetcher(t *testing.T) {
 	}
 	testParserError := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.Parser = fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
+			f.Parser = fetch.ParseBodyFunc(func(_ *url.URL, r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
 			})
 			bodyURLs := []string{"http://b", "http://c"}
@@ -59,7 +60,7 @@ func TestFetcher(t *testing.T) {
 
 	f := fetch.Fetcher{
 		Client: http.DefaultClient,
-		Parser: fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
+		Parser: fetch.ParseBodyFunc(func(_ *url.URL, r io.Reader) ([]string, error) {
 			s := bufio.NewScanner(r)
 			var result []string
 			for s.Scan() {
@@ -107,7 +108,7 @@ func TestBodyReader(t *testing.T) {
 	}
 	testBodyParserErr := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.Parser = fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
+			f.Parser = fetch.ParseBodyFunc(func(_ *url.URL, r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
 			})
 			var br bodyReader
@@ -146,7 +147,7 @@ func TestBodyReader(t *testing.T) {
 	}
 	testParserAndBodyReaderErr := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.Parser = fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
+			f.Parser = fetch.ParseBodyFunc(func(_ *url.URL, r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
 			})
 			f.BodyReader = fetch.BodyReaderFunc(func(c context.Context, r io.Reader) error {
@@ -169,7 +170,7 @@ func TestBodyReader(t *testing.T) {
 
 	f := fetch.Fetcher{
 		Client: http.DefaultClient,
-		Parser: fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
+		Parser: fetch.ParseBodyFunc(func(_ *url.URL, r io.Reader) ([]string, error) {
 			s := bufio.NewScanner(r)
 			var result []string
 			for s.Scan() {
