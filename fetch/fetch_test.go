@@ -2,6 +2,7 @@ package fetch_test
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"fmt"
 	"io"
@@ -55,6 +56,7 @@ func TestFetcher(t *testing.T) {
 			assertEqual(t, "fetch error", strings.Contains(err.Error(), "parser error"), true)
 		}
 	}
+
 	f := fetch.Fetcher{
 		Client: http.DefaultClient,
 		Parser: func(r io.Reader) ([]string, error) {
@@ -70,6 +72,117 @@ func TestFetcher(t *testing.T) {
 	t.Run("fetcher ok", testOk(f))
 	t.Run("context done", testContextDone(f))
 	t.Run("parser error", testParserError(f))
+
+}
+
+type bodyReader bytes.Buffer
+
+func (br *bodyReader) ReadBody(ctx context.Context, r io.Reader) error {
+	_, err := io.Copy((*bytes.Buffer)(br), r)
+	return err
+}
+
+func (br *bodyReader) body() string {
+	return string((*bytes.Buffer)(br).Bytes())
+}
+
+func TestBodyReader(t *testing.T) {
+	testBodyOk := func(f fetch.Fetcher) func(*testing.T) {
+		return func(t *testing.T) {
+			var br bodyReader
+			f.BodyReader = &br
+			bodyURLs := []string{"http://b", "http://c"}
+			response := fmt.Sprintf("%s\n%s\n", bodyURLs[0], bodyURLs[1])
+			ts := httptest.NewServer(
+				http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+					res.Write([]byte(response))
+				}),
+			)
+			defer ts.Close()
+			urls, err := f.Fetch(context.Background(), ts.URL)
+			assertEqual(t, "fetch error", err, nil)
+			assertEqual(t, "urls", urls, bodyURLs)
+			assertEqual(t, "body", br.body(), response)
+		}
+	}
+	testBodyParserErr := func(f fetch.Fetcher) func(*testing.T) {
+		return func(t *testing.T) {
+			f.Parser = func(r io.Reader) ([]string, error) {
+				return nil, fmt.Errorf("parser error")
+			}
+			var br bodyReader
+			f.BodyReader = &br
+			bodyURLs := []string{"http://b", "http://c"}
+			response := fmt.Sprintf("%s\n%s\n", bodyURLs[0], bodyURLs[1])
+			ts := httptest.NewServer(
+				http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+					res.Write([]byte(response))
+				}),
+			)
+			defer ts.Close()
+			urls, err := f.Fetch(context.Background(), ts.URL)
+			assertEqual(t, "fetch error", strings.Contains(err.Error(), "parser error"), true)
+			assertEqual(t, "urls", urls, []string(nil))
+			assertEqual(t, "body", br.body(), "")
+		}
+	}
+	testBodyReaderErr := func(f fetch.Fetcher) func(*testing.T) {
+		return func(t *testing.T) {
+			f.BodyReader = fetch.BodyReaderFunc(func(c context.Context, r io.Reader) error {
+				return fmt.Errorf("reader error")
+			})
+			bodyURLs := []string{"http://b", "http://c"}
+			response := fmt.Sprintf("%s\n%s\n", bodyURLs[0], bodyURLs[1])
+			ts := httptest.NewServer(
+				http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+					res.Write([]byte(response))
+				}),
+			)
+			defer ts.Close()
+			urls, err := f.Fetch(context.Background(), ts.URL)
+			assertEqual(t, "fetch error", strings.Contains(err.Error(), "reader error"), true)
+			assertEqual(t, "urls", urls, []string(nil))
+		}
+	}
+	testParserAndBodyReaderErr := func(f fetch.Fetcher) func(*testing.T) {
+		return func(t *testing.T) {
+			f.Parser = func(r io.Reader) ([]string, error) {
+				return nil, fmt.Errorf("parser error")
+			}
+			f.BodyReader = fetch.BodyReaderFunc(func(c context.Context, r io.Reader) error {
+				return fmt.Errorf("reader error")
+			})
+			bodyURLs := []string{"http://b", "http://c"}
+			response := fmt.Sprintf("%s\n%s\n", bodyURLs[0], bodyURLs[1])
+			ts := httptest.NewServer(
+				http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
+					res.Write([]byte(response))
+				}),
+			)
+			defer ts.Close()
+			urls, err := f.Fetch(context.Background(), ts.URL)
+			assertEqual(t, "fetch error", strings.Contains(err.Error(), "reader error"), true)
+			assertEqual(t, "fetch error", strings.Contains(err.Error(), "parser error"), true)
+			assertEqual(t, "urls", urls, []string(nil))
+		}
+	}
+
+	f := fetch.Fetcher{
+		Client: http.DefaultClient,
+		Parser: func(r io.Reader) ([]string, error) {
+			s := bufio.NewScanner(r)
+			var result []string
+			for s.Scan() {
+				result = append(result, s.Text())
+			}
+			return result, nil
+		},
+	}
+
+	t.Run("body reader ok", testBodyOk(f))
+	t.Run("body parser error", testBodyParserErr(f))
+	t.Run("body reader error", testBodyReaderErr(f))
+	t.Run("body reader error", testParserAndBodyReaderErr(f))
 }
 
 func assertEqual(t *testing.T, name string, result, expected interface{}) {
