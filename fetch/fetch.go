@@ -32,7 +32,7 @@ type (
 type Fetcher struct {
 	BaseURL    string
 	Client     *http.Client
-	Parser     ParseBodyFunc
+	Parser     BodyParser
 	BodyReader BodyReader
 }
 
@@ -56,7 +56,7 @@ func (f Fetcher) Fetch(ctx context.Context, url string) ([]string, error) {
 }
 
 func (f Fetcher) parseOnly(res *http.Response) ([]string, error) {
-	links, err := f.Parser(res.Body)
+	links, err := f.Parser.ParseBody(res.Body)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing links: %w", err)
 	}
@@ -83,7 +83,7 @@ func (f Fetcher) parseAndRead(ctx context.Context, res *http.Response) ([]string
 
 	// read body from pipe
 	var err error
-	links, err := f.Parser(pr)
+	links, err := f.Parser.ParseBody(pr)
 	if err != nil {
 		// if pipe reader has failed, we need to close writer
 		pw.Close()

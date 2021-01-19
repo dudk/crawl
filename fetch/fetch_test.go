@@ -41,9 +41,9 @@ func TestFetcher(t *testing.T) {
 	}
 	testParserError := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.Parser = func(r io.Reader) ([]string, error) {
+			f.Parser = fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
-			}
+			})
 			bodyURLs := []string{"http://b", "http://c"}
 			ts := httptest.NewServer(
 				http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
@@ -59,14 +59,14 @@ func TestFetcher(t *testing.T) {
 
 	f := fetch.Fetcher{
 		Client: http.DefaultClient,
-		Parser: func(r io.Reader) ([]string, error) {
+		Parser: fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
 			s := bufio.NewScanner(r)
 			var result []string
 			for s.Scan() {
 				result = append(result, s.Text())
 			}
 			return result, nil
-		},
+		}),
 	}
 
 	t.Run("fetcher ok", testOk(f))
@@ -107,9 +107,9 @@ func TestBodyReader(t *testing.T) {
 	}
 	testBodyParserErr := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.Parser = func(r io.Reader) ([]string, error) {
+			f.Parser = fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
-			}
+			})
 			var br bodyReader
 			f.BodyReader = &br
 			bodyURLs := []string{"http://b", "http://c"}
@@ -146,9 +146,9 @@ func TestBodyReader(t *testing.T) {
 	}
 	testParserAndBodyReaderErr := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.Parser = func(r io.Reader) ([]string, error) {
+			f.Parser = fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
-			}
+			})
 			f.BodyReader = fetch.BodyReaderFunc(func(c context.Context, r io.Reader) error {
 				return fmt.Errorf("reader error")
 			})
@@ -169,14 +169,14 @@ func TestBodyReader(t *testing.T) {
 
 	f := fetch.Fetcher{
 		Client: http.DefaultClient,
-		Parser: func(r io.Reader) ([]string, error) {
+		Parser: fetch.ParseBodyFunc(func(r io.Reader) ([]string, error) {
 			s := bufio.NewScanner(r)
 			var result []string
 			for s.Scan() {
 				result = append(result, s.Text())
 			}
 			return result, nil
-		},
+		}),
 	}
 
 	t.Run("body reader ok", testBodyOk(f))
