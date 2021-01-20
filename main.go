@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/dudk/crawl/caching"
@@ -35,7 +36,7 @@ func main() {
 	s := scheduling.UnboundScheduler{
 		BaseURL: f.rawURL,
 		ErrorHandler: scheduling.ErrorHandlerFunc(func(err error) {
-			fmt.Fprintf(os.Stdout, "fetcher error: %s\n", err.Error())
+			fmt.Fprintf(os.Stderr, "fetcher error: %s\n", err.Error())
 		}),
 		Fetcher: fetch.Fetcher{
 			Client: &http.Client{
@@ -46,7 +47,7 @@ func main() {
 				Visitor: caching.NewInMemoryCache(),
 			},
 			BodyReader: fetch.BodyReaderFunc(func(ctx context.Context, URL *url.URL, r io.Reader) error {
-				fmt.Printf("fetched: %v\n", URL)
+				fmt.Fprintf(os.Stdout, "fetched: %v\n", URL)
 				if _, err := io.Copy(ioutil.Discard, r); err != nil {
 					return fmt.Errorf("error discarding body: %w", err)
 				}
@@ -59,9 +60,11 @@ func main() {
 	sigint := make(chan os.Signal, 1)
 	// interrupt signal
 	signal.Notify(sigint, os.Interrupt)
+	signal.Notify(sigint, syscall.SIGINT)
 	go func() {
 		// block until signal received
 		<-sigint
+		fmt.Println("context cancelled")
 		cancelFn()
 	}()
 
