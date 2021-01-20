@@ -78,7 +78,7 @@ func TestFetcher(t *testing.T) {
 
 type bodyReader bytes.Buffer
 
-func (br *bodyReader) ReadBody(ctx context.Context, r io.Reader) error {
+func (br *bodyReader) ReadBody(ctx context.Context, URL *url.URL, r io.Reader) error {
 	_, err := io.Copy((*bytes.Buffer)(br), r)
 	return err
 }
@@ -129,7 +129,7 @@ func TestBodyReader(t *testing.T) {
 	}
 	testBodyReaderErr := func(f fetch.Fetcher) func(*testing.T) {
 		return func(t *testing.T) {
-			f.BodyReader = fetch.BodyReaderFunc(func(c context.Context, r io.Reader) error {
+			f.BodyReader = fetch.BodyReaderFunc(func(context.Context, *url.URL, io.Reader) error {
 				return fmt.Errorf("reader error")
 			})
 			bodyURLs := []string{"http://b", "http://c"}
@@ -150,7 +150,7 @@ func TestBodyReader(t *testing.T) {
 			f.Parser = fetch.ParseBodyFunc(func(_ *url.URL, r io.Reader) ([]string, error) {
 				return nil, fmt.Errorf("parser error")
 			})
-			f.BodyReader = fetch.BodyReaderFunc(func(c context.Context, r io.Reader) error {
+			f.BodyReader = fetch.BodyReaderFunc(func(context.Context, *url.URL, io.Reader) error {
 				return fmt.Errorf("reader error")
 			})
 			bodyURLs := []string{"http://b", "http://c"}

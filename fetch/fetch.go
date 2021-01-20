@@ -22,11 +22,11 @@ type (
 	// available in io.Reader. BodyReader must respect context and return
 	// if it's cancelled.
 	BodyReader interface {
-		ReadBody(context.Context, io.Reader) error
+		ReadBody(context.Context, *url.URL, io.Reader) error
 	}
 
 	// BodyReaderFunc implements BodyReader.
-	BodyReaderFunc func(context.Context, io.Reader) error
+	BodyReaderFunc func(context.Context, *url.URL, io.Reader) error
 )
 
 // Fetcher is responsible for recursive fetch of pages.
@@ -75,7 +75,7 @@ func (f Fetcher) parseAndRead(ctx context.Context, res *http.Response) ([]string
 		defer pw.Close()
 
 		// read HTTP body and write to pipe
-		err := f.BodyReader.ReadBody(ctx, tr)
+		err := f.BodyReader.ReadBody(ctx, res.Request.URL, tr)
 		if err != nil {
 			errChan <- err
 		}
@@ -102,8 +102,8 @@ func (f Fetcher) parseAndRead(ctx context.Context, res *http.Response) ([]string
 }
 
 // ReadBody implements BodyReader.
-func (fn BodyReaderFunc) ReadBody(ctx context.Context, r io.Reader) error {
-	return fn(ctx, r)
+func (fn BodyReaderFunc) ReadBody(ctx context.Context, URL *url.URL, r io.Reader) error {
+	return fn(ctx, URL, r)
 }
 
 // ParseBody implements BodyParser.
