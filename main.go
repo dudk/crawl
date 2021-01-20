@@ -4,27 +4,27 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
-	"sync"
-)
+	"os/signal"
+	"time"
 
-type crawler struct {
-	wg      sync.WaitGroup
-	m       sync.Mutex
-	visited map[string]struct{}
-}
+	"github.com/dudk/crawl/caching"
+	"github.com/dudk/crawl/fetch"
+	"github.com/dudk/crawl/parsing"
+	"github.com/dudk/crawl/scheduling"
+)
 
 type flags struct {
 	rawURL string
-	path   string
 }
 
 func main() {
 	var f flags
-	flag.StringVar(&f.rawURL, "url", "", "base URL for crawling")
-	flag.StringVar(&f.path, "path", "", "path to save crawling result")
+	flag.StringVar(&f.rawURL, "url", "", "Fully-specified base URL for crawling. If it's not ended with a slash, single URL will be fetched.")
 	flag.Parse()
 	if err := f.validate(); err != nil {
 		fmt.Fprintf(os.Stderr, "invalid input: %s\n", err)
@@ -32,54 +32,43 @@ func main() {
 		os.Exit(1)
 	}
 
-	c := crawler{
-		visited: make(map[string]struct{}),
+	s := scheduling.UnboundScheduler{
+		BaseURL: f.rawURL,
+		ErrorHandler: scheduling.ErrorHandlerFunc(func(err error) {
+			fmt.Fprintf(os.Stdout, "fetcher error: %s\n", err.Error())
+		}),
+		Fetcher: fetch.Fetcher{
+			Client: &http.Client{
+				Timeout: 10 * time.Second,
+			},
+			Parser: parsing.HTML{
+				BaseURL: f.rawURL,
+				Visitor: caching.NewInMemoryCache(),
+			},
+			BodyReader: fetch.BodyReaderFunc(func(ctx context.Context, URL *url.URL, r io.Reader) error {
+				fmt.Printf("fetched: %v\n", URL)
+				if _, err := io.Copy(ioutil.Discard, r); err != nil {
+					return fmt.Errorf("error discarding body: %w", err)
+				}
+				return nil
+			}),
+		},
 	}
+	ctx, cancelFn := context.WithCancel(context.Background())
 
-	<-c.Start(context.Background(), f.rawURL)
-}
+	sigint := make(chan os.Signal, 1)
+	// interrupt signal
+	signal.Notify(sigint, os.Interrupt)
+	go func() {
+		// block until signal received
+		<-sigint
+		cancelFn()
+	}()
 
-func (c *crawler) Start(ctx context.Context, url string) chan struct{} {
-	done := make(chan struct{})
-	defer close(done)
-	c.wg.Add(1)
-	go c.fetch(ctx, url, url)
-	c.wg.Wait()
-	return done
-}
-
-func (c *crawler) fetch(ctx context.Context, url, baseURL string) {
-	defer c.wg.Done()
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		unhandled(err)
-	}
-
-	res, err := http.DefaultClient.Do(req.WithContext(ctx))
-	if err != nil {
-		unhandled(err)
-	}
-
-	_ = parse(res)
-}
-
-func parse(res *http.Response) []string {
-	fmt.Println(res.Header.Get("Content-Type"))
-	return nil
+	s.Start(ctx)
 }
 
 func (f flags) validate() error {
-	if len(f.path) == 0 {
-		return fmt.Errorf("path is required")
-	}
-	fi, err := os.Lstat(f.path)
-	if err != nil {
-		return fmt.Errorf("invalid path: %w", err)
-	}
-	if !fi.IsDir() {
-		return fmt.Errorf("path is not a direcotry")
-	}
-
 	if len(f.rawURL) == 0 {
 		return fmt.Errorf("URL is required")
 	}
@@ -96,8 +85,4 @@ func (f flags) validate() error {
 	}
 
 	return nil
-}
-
-func unhandled(err error) {
-	panic(fmt.Errorf("unhandled error: %w", err))
 }
