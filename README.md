@@ -1,9 +1,10 @@
 ## Recursive crawler
 
+Crawler prints crawled URLs to stdout.
+
 #### Input
 
 * URL
-* Path
 
 #### Design
 
