@@ -34,7 +34,8 @@ func (fn ErrorHandlerFunc) Handle(err error) {
 	fn(err)
 }
 
-// Start scheduler execution.
+// Start scheduler execution. This call blocks goroutine until all URLs are
+// fetched or context is cancelled.
 func (s *UnboundScheduler) Start(ctx context.Context) {
 	s.wg.Add(1)
 	go s.fetch(ctx, s.BaseURL)
